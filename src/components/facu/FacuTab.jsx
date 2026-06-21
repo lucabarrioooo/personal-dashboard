@@ -12,9 +12,9 @@ export default function FacuTab() {
   const [materias, setMaterias] = useState([])
   const [cursada, setCursada] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Seed materias si la colección está vacía
     const seedMaterias = async () => {
       const allMaterias = PLAN_ESTUDIOS.flatMap(b =>
         b.materias.map(m => ({ ...m, anio: b.anio, cuatrimestre: b.cuatrimestre }))
@@ -30,28 +30,38 @@ export default function FacuTab() {
       }
     }
 
-    const unsubMaterias = onSnapshot(collection(db, 'materias'), async (snap) => {
-      if (snap.empty) {
-        await seedMaterias()
-      } else {
-        const data = snap.docs.map(d => d.data())
-        setMaterias(data)
+    const unsubMaterias = onSnapshot(
+      collection(db, 'materias'),
+      async (snap) => {
+        if (snap.empty) {
+          await seedMaterias()
+        } else {
+          setMaterias(snap.docs.map(d => d.data()))
+          setLoading(false)
+        }
+      },
+      (err) => {
+        console.error('Firestore materias error:', err)
+        setError(err.message)
         setLoading(false)
       }
-    })
+    )
 
-    const unsubCursada = onSnapshot(collection(db, 'cursadaActual'), async (snap) => {
-      if (snap.empty) {
-        await seedCursada()
-      } else {
-        setCursada(snap.docs.map(d => d.data()))
-      }
-    })
+    const unsubCursada = onSnapshot(
+      collection(db, 'cursadaActual'),
+      async (snap) => {
+        if (snap.empty) {
+          await seedCursada()
+        } else {
+          setCursada(snap.docs.map(d => d.data()))
+        }
+      },
+      (err) => console.error('Firestore cursada error:', err)
+    )
 
     return () => { unsubMaterias(); unsubCursada() }
   }, [])
 
-  // Reconstruir la estructura por bloque con datos actualizados de Firestore
   const materiasPorBloque = PLAN_ESTUDIOS.map(bloque => ({
     ...bloque,
     materias: bloque.materias.map(m => {
@@ -61,6 +71,14 @@ export default function FacuTab() {
   }))
 
   if (loading) return <div style={styles.loading}>Cargando plan de estudios...</div>
+
+  if (error) return (
+    <div style={{ ...styles.loading, color: '#ef4444' }}>
+      <p style={{ marginBottom: '8px', fontWeight: 600 }}>Error de Firestore:</p>
+      <code style={{ fontSize: '13px', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '6px', display: 'block' }}>{error}</code>
+      <p style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>Revisá que Firestore esté en modo "test" en la consola de Firebase.</p>
+    </div>
+  )
 
   return (
     <div style={styles.container}>
